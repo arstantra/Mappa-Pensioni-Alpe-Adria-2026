@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Aggiorna posizione — Alpe Adria in bici</title>
+<style>
+  :root{
+    --cream:#f3ead9; --cream-dark:#e8dcc4; --brown:#3b2f28; --brown-soft:#6b5a4d;
+    --terracotta:#c1502e; --terracotta-dark:#9c3d21; --green:#4b6b3a; --line:#b8ab8f;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; font-family: Georgia, 'Times New Roman', serif; background:var(--cream); color:var(--brown); }
+  body{ min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 18px; text-align:center; }
+  h1{ font-size:1.15rem; margin:0 0 6px; }
+  p.sub{ font-size:0.82rem; color:var(--brown-soft); font-style:italic; margin:0 0 26px; }
+  .chi-buttons{ display:flex; gap:14px; margin-bottom:18px; }
+  button.chi{
+    flex:1; padding:22px 10px; font-family:Georgia,serif; font-size:1.05rem; font-weight:bold;
+    border:2px solid var(--brown); border-radius:12px; background:#fffdf7; color:var(--brown);
+    cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.2);
+  }
+  button.chi:active{ background:var(--cream-dark); }
+  button.chi.selected{ background:var(--terracotta); color:#fff; border-color:var(--terracotta-dark); }
+  #sendBtn{
+    width:100%; max-width:320px; padding:16px; font-family:Georgia,serif; font-size:1rem; font-weight:bold;
+    border:2px solid var(--terracotta-dark); border-radius:10px; background:var(--terracotta); color:#fff;
+    cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.25);
+  }
+  #sendBtn:disabled{ opacity:0.5; }
+  #status{ margin-top:18px; font-size:0.88rem; min-height:1.4em; max-width:320px; }
+  #status.ok{ color:var(--green); font-weight:bold; }
+  #status.err{ color:var(--terracotta-dark); }
+  footer{ margin-top:34px; font-size:0.68rem; color:var(--brown-soft); }
+</style>
+</head>
+<body>
+
+<h1>📍 Aggiorna la nostra posizione</h1>
+<p class="sub">Pagina privata — non collegata dalla mappa pubblica.<br>Chi tocca "invia" aggiorna il puntino che vedono tutti.</p>
+
+<div class="chi-buttons">
+  <button class="chi" id="btnAndrea" type="button">Andrea</button>
+  <button class="chi" id="btnBea" type="button">Bea</button>
+</div>
+
+<button id="sendBtn" type="button" disabled>Invia posizione</button>
+<div id="status"></div>
+
+<footer>Alpe Adria in bici · agosto 2026</footer>
+
+<script>
+// Stessa chiave segreta impostata in Code.gs (Apps Script) — non condividere questa pagina.
+const SHARED_POS_URL = 'https://script.google.com/macros/s/AKfycbx3UCxMnkAA5FKw9Ou-JuayfcqnvWnQJpH_zvbOJafWG08yf66CLnM9BZ8mYfpICxWsjA/exec'; // es. https://script.google.com/macros/s/XXXXX/exec
+const SECRET_KEY = '43ylv0x8vyhatqt0';
+
+let chiSelezionato = null;
+const btnAndrea = document.getElementById('btnAndrea');
+const btnBea = document.getElementById('btnBea');
+const sendBtn = document.getElementById('sendBtn');
+const statusEl = document.getElementById('status');
+
+function selectChi(nome, btn){
+  chiSelezionato = nome;
+  [btnAndrea, btnBea].forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  sendBtn.disabled = false;
+}
+btnAndrea.addEventListener('click', () => selectChi('Andrea', btnAndrea));
+btnBea.addEventListener('click', () => selectChi('Bea', btnBea));
+
+sendBtn.addEventListener('click', function(){
+  if(!chiSelezionato) return;
+  if(!navigator.geolocation){
+    statusEl.textContent = 'Geolocalizzazione non supportata su questo dispositivo.';
+    statusEl.className = 'err';
+    return;
+  }
+  if(SHARED_POS_URL.indexOf('INCOLLA_QUI') !== -1){
+    statusEl.textContent = 'URL Apps Script non ancora configurato in questa pagina.';
+    statusEl.className = 'err';
+    return;
+  }
+  sendBtn.disabled = true;
+  statusEl.textContent = 'Rilevo la posizione…';
+  statusEl.className = '';
+
+  navigator.geolocation.getCurrentPosition(function(pos){
+    const { latitude, longitude } = pos.coords;
+    const url = SHARED_POS_URL + '?action=write&key=' + encodeURIComponent(SECRET_KEY)
+      + '&lat=' + latitude + '&lon=' + longitude + '&chi=' + encodeURIComponent(chiSelezionato);
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if(data && data.ok){
+          statusEl.textContent = 'Posizione aggiornata ✅ (' + chiSelezionato + ')';
+          statusEl.className = 'ok';
+        } else {
+          statusEl.textContent = 'Errore: ' + (data && data.error ? data.error : 'sconosciuto');
+          statusEl.className = 'err';
+        }
+        sendBtn.disabled = false;
+      })
+      .catch(function(err){
+        statusEl.textContent = 'Errore di rete: ' + err.message;
+        statusEl.className = 'err';
+        sendBtn.disabled = false;
+      });
+  }, function(err){
+    statusEl.textContent = 'Impossibile ottenere la posizione: ' + err.message;
+    statusEl.className = 'err';
+    sendBtn.disabled = false;
+  }, { enableHighAccuracy:true, timeout:8000 });
+});
+</script>
+
+</body>
+</html>

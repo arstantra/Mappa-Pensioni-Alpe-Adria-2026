@@ -135,6 +135,7 @@
   <span class="item"><span class="dot" style="background:var(--green-light)"></span> confermata</span>
   <span class="item"><span class="dot letterdot">A</span> candidata — tocca per segnare lo stato</span>
   <span class="item"><span class="dot" style="background:var(--brown)"></span> arrivo</span>
+  <span class="item"><span class="dot" style="background:var(--terracotta)"></span> Andrea e Bea (posizione condivisa)</span>
   <span class="item"><span class="line"></span> treno andata</span>
   <span class="item"><span class="line ritorno"></span> treno ritorno</span>
 </div>
@@ -477,6 +478,39 @@ document.getElementById('locateBtn').addEventListener('click', function(){
     alert('Impossibile ottenere la posizione: ' + err.message);
   }, { enableHighAccuracy:true, timeout:8000 });
 });
+
+// Posizione condivisa Andrea/Bea — letta da un piccolo "database" condiviso (Google Apps Script + Sheet).
+// Aggiornata solo da chi ha il link privato (update.html), non da chi guarda la mappa.
+const SHARED_POS_URL = 'https://script.google.com/macros/s/AKfycbx3UCxMnkAA5FKw9Ou-JuayfcqnvWnQJpH_zvbOJafWG08yf66CLnM9BZ8mYfpICxWsjA/exec'; // es. https://script.google.com/macros/s/XXXXX/exec
+let sharedMarker = null;
+
+function fmtQuando(iso){
+  try{
+    const d = new Date(iso);
+    return d.toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }catch(e){ return ''; }
+}
+
+function refreshSharedPosition(){
+  if(!SHARED_POS_URL || SHARED_POS_URL.indexOf('INCOLLA_QUI') !== -1) return;
+  fetch(SHARED_POS_URL + '?action=read')
+    .then(r => r.json())
+    .then(data => {
+      if(!data || data.lat === null || data.lat === undefined || data.lat === '') return;
+      const lat = parseFloat(data.lat), lon = parseFloat(data.lon);
+      if(isNaN(lat) || isNaN(lon)) return;
+      const chi = data.chi || 'Andrea e Bea';
+      const quando = data.ts ? fmtQuando(data.ts) : '';
+      if(sharedMarker) map.removeLayer(sharedMarker);
+      sharedMarker = L.circleMarker([lat, lon], {
+        radius:10, fillColor:'#c1502e', color:'#7a2f18', weight:2, fillOpacity:0.95
+      }).addTo(map).bindPopup('<b>' + chi + '</b><br>aggiornato ' + quando);
+    })
+    .catch(function(){ /* silenzioso: niente rete o URL non ancora configurato */ });
+}
+
+refreshSharedPosition();
+setInterval(refreshSharedPosition, 90000); // riprova ogni 90s
 </script>
 
 </body>
