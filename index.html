@@ -138,8 +138,8 @@
 </header>
 
 <div id="legend">
-  <span class="item"><span class="dot" style="background:var(--green-light)"></span> confermata</span>
-  <span class="item"><span class="dot letterdot">A</span> candidata — tocca per segnare lo stato</span>
+  <span class="item"><span class="dot letterdot" style="background:var(--green-light);border-color:var(--green)">0</span> confermata (numero notte)</span>
+  <span class="item"><span class="dot letterdot">A</span> candidata — tocca per segnare lo stato (occupato/escluse spariscono)</span>
   <span class="item"><span class="dot" style="background:var(--brown)"></span> arrivo</span>
   <span class="item"><span class="dot" style="background:var(--terracotta)"></span> Andrea e Bea (posizione condivisa)</span>
   <span class="item"><span class="line"></span> treno andata</span>
@@ -330,11 +330,17 @@ function popupRows(s){
   return html;
 }
 
-// --- Notti confermate: un solo marker verde ciascuna ---
+// --- Notti confermate: badge verde con il numero della notte ---
+function confirmedIcon(night){
+  return L.divIcon({
+    className: 'candidate-marker',
+    html: `<div style="width:28px;height:28px;border-radius:50%;background:#8fae74;border:2.5px solid #4b6b3a;display:flex;align-items:center;justify-content:center;font-weight:bold;font-family:Georgia,serif;font-size:13px;color:#1f3315;box-shadow:0 1px 3px rgba(0,0,0,0.35);">${night}</div>`,
+    iconSize:[28,28], iconAnchor:[14,14]
+  });
+}
+
 confirmed.forEach(s=>{
-  const marker = L.circleMarker([s.lat, s.lon], {
-    radius: 10, fillColor:'#8fae74', color:'#4b6b3a', weight:2, fillOpacity:0.95
-  }).addTo(map);
+  const marker = L.marker([s.lat, s.lon], { icon: confirmedIcon(s.night) }).addTo(map);
   let html = `<div class="popup-title">${s.name}</div>`;
   html += `<div class="popup-sub">Notte ${s.night} — ${s.town} · ${s.date}/2026</div>`;
   html += `<span class="popup-badge b-confermato">confermata</span>`;
@@ -345,6 +351,8 @@ confirmed.forEach(s=>{
 });
 
 // --- Notti da confermare: candidate con lettera + stato modificabile ---
+// "occupato" e le alternative escluse da una conferma diventano invisibili (opacità 0):
+// spariscono dalla mappa ma il dato resta nel codice sorgente, nulla viene perso.
 const statusStyle = {
   dachiamare:  { bg:'#ffffff', border:'#6b5a4d', text:'#3b2f28', label:'da chiamare' },
   occupato:    { bg:'#e3d9c9', border:'#9c3d21', text:'#9c3d21', label:'occupato / pieno' },
@@ -359,9 +367,11 @@ function candidateIcon(letter, status){
   });
 }
 
-const candidateMarkers = {}; // statusKey -> {marker, letter}
+const candidateMarkers = {}; // statusKey -> {marker, letter, night, defaultStatus}
+const nightGroups = {}; // night -> [statusKey, ...]
 
 candidateGroups.forEach(group=>{
+  nightGroups[group.night] = [];
   group.items.forEach(item=>{
     const statusKey = `aa2026_${group.night}_${item.letter}`;
     const saved = localStorage.getItem(statusKey);
@@ -385,10 +395,31 @@ candidateGroups.forEach(group=>{
       return html;
     });
 
-    candidateMarkers[statusKey] = { marker, letter: item.letter, popupRefresh: null };
+    candidateMarkers[statusKey] = { marker, letter: item.letter, night: group.night, defaultStatus: item.status };
+    nightGroups[group.night].push(statusKey);
     bikeBounds.push([item.lat, item.lon]);
   });
 });
+
+// Ricalcola icona + visibilità di tutte le candidate di una notte:
+// se una è "confermato", solo quella resta visibile; le "occupato" spariscono sempre.
+function refreshGroupVisibility(night){
+  const keys = nightGroups[night] || [];
+  const withStatus = keys.map(k => ({ key:k, val: localStorage.getItem(k) || candidateMarkers[k].defaultStatus }));
+  const confirmedEntry = withStatus.find(s => s.val === 'confermato');
+  withStatus.forEach(s=>{
+    const entry = candidateMarkers[s.key];
+    entry.marker.setIcon(candidateIcon(entry.letter, s.val));
+    if(confirmedEntry){
+      entry.marker.setOpacity(s.key === confirmedEntry.key ? 1 : 0);
+    } else {
+      entry.marker.setOpacity(s.val === 'occupato' ? 0 : 1);
+    }
+  });
+}
+
+// Passata iniziale: applica subito la visibilità corretta a tutte le notti candidate.
+Object.keys(nightGroups).forEach(n => refreshGroupVisibility(n));
 
 // Applica uno stato remoto (arrivato da altri dispositivi) a un marker candidato
 function applyRemoteStatus(statusKey, val){
@@ -396,7 +427,7 @@ function applyRemoteStatus(statusKey, val){
   if(localStorage.getItem(statusKey) === val) return; // già allineato
   localStorage.setItem(statusKey, val);
   if(candidateMarkers[statusKey]){
-    candidateMarkers[statusKey].marker.setIcon(candidateIcon(candidateMarkers[statusKey].letter, val));
+    refreshGroupVisibility(candidateMarkers[statusKey].night);
   }
 }
 
@@ -410,7 +441,7 @@ map.on('popupopen', function(e){
       const val = this.value;
       localStorage.setItem(key, val);
       if(candidateMarkers[key]){
-        candidateMarkers[key].marker.setIcon(candidateIcon(candidateMarkers[key].letter, val));
+        refreshGroupVisibility(candidateMarkers[key].night);
       }
       syncStatusToServer(key, val);
     });
