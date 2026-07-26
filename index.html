@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>Alpe Adria in bici — Mappa pensioni</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --cream:#f3ead9;
+    --cream-dark:#e8dcc4;
+    --brown:#3b2f28;
+    --brown-soft:#6b5a4d;
+    --terracotta:#c1502e;
+    --terracotta-dark:#9c3d21;
+    --green:#4b6b3a;
+    --green-light:#8fae74;
+    --amber:#d99a3d;
+    --amber-light:#f0c98a;
+    --line:#b8ab8f;
+    --blue:#2b6bd9;
+    --blue-dark:#173e82;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; font-family: Georgia, 'Times New Roman', serif; background: var(--cream); color: var(--brown); }
+  body{ display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+  header{
+    background: var(--brown);
+    color: var(--cream);
+    padding: 12px 16px 10px;
+    text-align:center;
+    flex: 0 0 auto;
+  }
+  header h1{ margin:0; font-size: 1.2rem; letter-spacing: 0.5px; }
+  header p{ margin: 4px 0 0; font-size: 0.78rem; color: var(--cream-dark); font-style: italic; }
+  header a{ color: var(--amber-light); font-style:normal; }
+  #legend{
+    display:flex; flex-wrap:wrap; gap: 8px 14px;
+    justify-content:center;
+    background: var(--cream-dark);
+    padding: 7px 10px;
+    font-size: 0.74rem;
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+  #legend .item{ display:flex; align-items:center; gap:5px; white-space:nowrap; }
+  #legend .dot{ width:11px; height:11px; border-radius:50%; display:inline-block; border: 2px solid rgba(0,0,0,0.25); flex-shrink:0; }
+  #legend .dot.letterdot{ width:16px; height:16px; font-size:9px; font-weight:bold; color:var(--brown); display:flex; align-items:center; justify-content:center; background:#fff; border-color:var(--brown-soft); }
+  #legend .line{ width:18px; height:0; border-top:3px dashed var(--blue); display:inline-block; }
+  #legend .line.ritorno{ border-top-color: var(--amber); }
+
+  details#trainPanel{ flex:0 0 auto; background:#fffdf7; border-bottom:1px solid var(--line); }
+  details#trainPanel summary{
+    cursor:pointer; padding:8px 14px; font-size:0.82rem; font-weight:bold; color:var(--brown);
+    background: var(--cream-dark); list-style:none; display:flex; align-items:center; gap:6px;
+  }
+  details#trainPanel summary::-webkit-details-marker{ display:none; }
+  details#trainPanel summary::before{ content:"▸"; display:inline-block; transition:transform .15s; }
+  details#trainPanel[open] summary::before{ transform:rotate(90deg); }
+  #trainPanelBody{ padding:8px 14px 12px; max-height:38vh; overflow-y:auto; }
+  .tp-section{ margin-bottom:10px; }
+  .tp-section h3{ margin:0 0 4px; font-size:0.85rem; color:var(--terracotta-dark); }
+  .tp-row{ display:flex; gap:8px; font-size:0.76rem; padding:3px 0; border-bottom:1px dotted var(--line); line-height:1.3; }
+  .tp-row:last-child{ border-bottom:none; }
+  .tp-time{ flex:0 0 84px; font-weight:bold; color:var(--brown); }
+  .tp-detail{ flex:1; color:var(--brown-soft); }
+  .tp-detail b{ color:var(--brown); }
+  .tp-note{ font-size:0.72rem; color:var(--brown-soft); font-style:italic; margin-top:4px; }
+
+  #mapwrap{ position:relative; flex:1 1 auto; min-height:280px; }
+  #map{ position:absolute; top:0; left:0; right:0; bottom:0; }
+  .mapbtn{
+    position:absolute; right:10px; z-index:1000;
+    background:#fffdf7; border:2px solid var(--brown); border-radius:8px;
+    padding:9px 12px; font-family: Georgia, serif; font-size:0.85rem; color:var(--brown);
+    box-shadow:0 2px 5px rgba(0,0,0,0.25); cursor:pointer;
+  }
+  .mapbtn:active{ background: var(--cream-dark); }
+  #locateBtn{ top:10px; }
+  #trainBtn{ top:60px; }
+  #trainBtn.active{ background: var(--blue); color:#fff; border-color:var(--blue-dark); }
+  .popup-title{ font-weight:bold; font-size:1.0rem; margin-bottom:2px; color: var(--brown); }
+  .popup-sub{ font-size:0.76rem; color: var(--brown-soft); margin-bottom:6px; font-style:italic; }
+  .popup-badge{
+    display:inline-block; font-size:0.66rem; font-weight:bold; text-transform:uppercase;
+    padding: 2px 7px; border-radius: 10px; margin-bottom:6px; letter-spacing:0.4px;
+  }
+  .b-confermato{ background: var(--green-light); color:#1f3315; }
+  .b-candidata{ background:#fff; color:var(--brown-soft); border:1px solid var(--brown-soft); }
+  .b-treno{ background: var(--blue); color:#fff; }
+  .popup-row{ font-size: 0.8rem; margin: 3px 0; line-height:1.35; }
+  .popup-row b{ color: var(--brown); }
+  .popup-event{ font-size:0.78rem; margin:4px 0; padding:5px 7px; background:var(--cream-dark); border-radius:5px; line-height:1.35; }
+  .popup-event b{ color: var(--terracotta-dark); }
+  .popup-cancel{
+    margin-top:6px; padding:6px 8px; border-radius:6px; font-size:0.76rem; line-height:1.35;
+    background: var(--cream-dark); border-left: 3px solid var(--terracotta);
+  }
+  .popup-cancel.ok{ border-left-color: var(--green); }
+  a.popup-link{ color: var(--terracotta-dark); }
+  .popup-status{
+    margin-top:8px; padding:7px 8px; border-radius:6px; background: var(--cream-dark);
+    font-size:0.76rem;
+  }
+  .popup-status .status-title{ font-weight:bold; margin-bottom:4px; display:block; }
+  .popup-status label{ display:flex; align-items:center; gap:6px; margin:3px 0; cursor:pointer; }
+  .popup-status input[type=radio]{ margin:0; }
+  footer{
+    background: var(--cream-dark); text-align:center; font-size: 0.66rem; color: var(--brown-soft);
+    padding: 5px 10px; border-top: 1px solid var(--line); flex: 0 0 auto;
+  }
+  footer a{ color: var(--terracotta-dark); }
+  .leaflet-popup-content-wrapper{ background: #fffdf7; border-radius: 8px; }
+  .leaflet-popup-content{ margin: 12px 14px; width: min(74vw, 270px) !important; }
+  .leaflet-popup-tip{ background:#fffdf7; }
+  .candidate-marker, .train-marker{ background:transparent; border:none; }
+  /* touch target un po' più grande per marker piccoli su schermi tattili */
+  @media (max-width: 480px){
+    header h1{ font-size: 1.05rem; }
+    #legend{ font-size: 0.7rem; gap:6px 10px; }
+    #trainPanelBody{ max-height:32vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Alpe Adria in bici — pensioni</h1>
+  <p>Ferrara → Mallnitz → Grado · notti 0-6 · aggiornato al 26/07/2026</p>
+  <p>Percorso ufficiale: <a href="https://www.alpe-adria-radweg.com/" target="_blank">alpe-adria-radweg.com</a></p>
+</header>
+
+<div id="legend">
+  <span class="item"><span class="dot" style="background:var(--green-light)"></span> confermata</span>
+  <span class="item"><span class="dot letterdot">A</span> candidata — tocca per segnare lo stato</span>
+  <span class="item"><span class="dot" style="background:var(--brown)"></span> arrivo</span>
+  <span class="item"><span class="line"></span> treno andata</span>
+  <span class="item"><span class="line ritorno"></span> treno ritorno</span>
+</div>
+
+<details id="trainPanel">
+  <summary>🚆 Orari treni — andata (6-7 agosto) e ritorno (14 agosto)</summary>
+  <div id="trainPanelBody">
+    <div class="tp-section">
+      <h3>Andata — giovedì 6 agosto</h3>
+      <div class="tp-row"><div class="tp-time">pomeriggio</div><div class="tp-detail"><b>Ferrara → Venezia S. Lucia</b> — Regionale, bici al seguito, ~1h15-1h20, un treno circa ogni ora. Nessuna prenotazione necessaria. Notte a Venezia Santa Marta (casa di Andrea).</div></div>
+    </div>
+    <div class="tp-section">
+      <h3>Andata — venerdì 7 agosto</h3>
+      <div class="tp-row"><div class="tp-time">05:13→08:02</div><div class="tp-detail"><b>Venezia S.Lucia → Gorizia Centrale</b> — Regionale 16754 (via Treviso-Sacile-Casarsa-Cormons). ✅ prenotato.</div></div>
+      <div class="tp-row"><div class="tp-time">~58 min</div><div class="tp-detail"><b>Gorizia Centrale → Nova Gorica</b> — cambio a piedi/bici, ~1,8 km, confine a Piazza Transalpina. Nessun biglietto.</div></div>
+      <div class="tp-row"><div class="tp-time">09:00→11:11</div><div class="tp-detail"><b>Nova Gorica → Jesenice</b> (SLO) — R 4202. ✅ prenotato.</div></div>
+      <div class="tp-row"><div class="tp-time">12:30→13:15</div><div class="tp-detail"><b>Jesenice → Villach Hbf</b> — EC 214, posto bici riservato (carrozza 255).</div></div>
+      <div class="tp-row"><div class="tp-time">pomeriggio</div><div class="tp-detail"><b>Villach Hbf → Mallnitz</b> — Regionale/S-Bahn, carrozza bici dedicata. Nessuna prenotazione. Arrivo Mallnitz primo pomeriggio.</div></div>
+    </div>
+    <div class="tp-section">
+      <h3>Ritorno — venerdì 14 agosto</h3>
+      <div class="tp-row"><div class="tp-time">19:53→23:06</div><div class="tp-detail"><b>Cervignano-Aquileia-Grado → Ferrara</b> — Regionale 3448/3993, 1 cambio a Venezia Mestre (orario esatto del cambio da verificare all'acquisto), a partire da 39,30€. 3h13min totali.</div></div>
+      <div class="tp-note">⚠️ Da acquistare: biglietto passeggeri x2 + supplemento bici x2 separato. Data e disponibilità posti bici ancora da confermare.</div>
+    </div>
+  </div>
+</details>
+
+<div id="mapwrap">
+  <div id="map"></div>
+  <button id="locateBtn" class="mapbtn">📍 Dove sono</button>
+  <button id="trainBtn" class="mapbtn">🚆 Treni</button>
+</div>
+
+<footer>Percorso bici tracciato sulle vie reali (OpenStreetMap / BRouter, ricalcato sulla Ciclovia Alpe Adria — <a href="https://www.alpe-adria-radweg.com/" target="_blank">alpe-adria-radweg.com</a>). Linee ferroviarie indicative (stazione-stazione, non il tracciato esatto dei binari). Lo stato di ogni candidata alloggio si salva solo su questo dispositivo/browser.</footer>
+
+<script>
+const routeCoords = [[46.97371,13.17614],[46.9736,13.17654],[46.97445,13.17642],[46.97354,13.17765],[46.97306,13.18024],[46.97121,13.18182],[46.9703,13.18348],[46.96783,13.18291],[46.96753,13.18142],[46.96725,13.1814],[46.96754,13.18401],[46.96863,13.1848],[46.96847,13.18529],[46.96734,13.18485],[46.96641,13.18229],[46.96429,13.18124],[46.96416,13.18179],[46.96509,13.18194],[46.96557,13.18263],[46.96607,13.18433],[46.96569,13.18516],[46.96154,13.18543],[46.95933,13.18434],[46.95613,13.18522],[46.95321,13.18327],[46.94885,13.18208],[46.94681,13.18284],[46.94416,13.18565],[46.94216,13.1891],[46.9415,13.19099],[46.93973,13.19258],[46.93752,13.19701],[46.93593,13.1991],[46.93368,13.19783],[46.93333,13.1991],[46.93231,13.20058],[46.93171,13.20538],[46.92999,13.20833],[46.92908,13.21114],[46.92841,13.21669],[46.92772,13.21876],[46.92688,13.22067],[46.9247,13.22318],[46.92482,13.22581],[46.92388,13.22774],[46.92285,13.23147],[46.92168,13.23296],[46.91784,13.23578],[46.91749,13.23683],[46.91634,13.2379],[46.91463,13.24086],[46.91479,13.24257],[46.91554,13.24457],[46.91511,13.24614],[46.91261,13.24849],[46.91221,13.24955],[46.91141,13.24975],[46.90913,13.25331],[46.9059,13.25669],[46.90557,13.25858],[46.90355,13.26091],[46.90292,13.26244],[46.90116,13.26199],[46.89957,13.25973],[46.89674,13.26053],[46.89699,13.25955],[46.89625,13.25851],[46.89572,13.25914],[46.89371,13.25952],[46.89285,13.25865],[46.89237,13.25873],[46.89109,13.25974],[46.88921,13.26263],[46.88658,13.26352],[46.88466,13.26587],[46.88437,13.26748],[46.88207,13.27245],[46.87914,13.28114],[46.87925,13.28477],[46.87846,13.28758],[46.87854,13.2927],[46.8789,13.29327],[46.87763,13.29509],[46.87755,13.29662],[46.87637,13.30037],[46.8752,13.30225],[46.87471,13.30581],[46.87403,13.30569],[46.87327,13.30684],[46.87109,13.31299],[46.86945,13.31467],[46.87008,13.31591],[46.87023,13.31787],[46.86937,13.32061],[46.86813,13.32126],[46.86789,13.32792],[46.86718,13.33035],[46.86442,13.33461],[46.85876,13.33425],[46.85864,13.33487],[46.8573,13.33576],[46.85661,13.33734],[46.85649,13.34144],[46.85524,13.34621],[46.85629,13.347],[46.85638,13.34756],[46.85628,13.35029],[46.85592,13.35108],[46.85414,13.3513],[46.85278,13.35437],[46.85129,13.35273],[46.85045,13.35282],[46.84846,13.35685],[46.84899,13.35824],[46.84782,13.36088],[46.84602,13.3591],[46.84359,13.36376],[46.8428,13.36449],[46.84202,13.36716],[46.83779,13.36959],[46.83763,13.37056],[46.8383,13.37135],[46.83818,13.37198],[46.84006,13.38093],[46.83996,13.38385],[46.84038,13.38595],[46.83888,13.38911],[46.83897,13.39168],[46.83994,13.39423],[46.8367,13.40091],[46.83521,13.40647],[46.83312,13.40925],[46.83295,13.41153],[46.8326,13.41192],[46.83143,13.41785],[46.83007,13.43089],[46.83148,13.44057],[46.83095,13.44567],[46.829,13.44603],[46.8264,13.44447],[46.82346,13.44403],[46.82268,13.44694],[46.82338,13.44879],[46.82189,13.45132],[46.81968,13.45357],[46.81717,13.45502],[46.81568,13.45688],[46.81393,13.4636],[46.81036,13.47063],[46.80881,13.47533],[46.80675,13.47982],[46.80579,13.48016],[46.80319,13.48329],[46.80066,13.48486],[46.80067,13.48614],[46.79818,13.48809],[46.79781,13.48913],[46.79806,13.48961],[46.79653,13.49249],[46.79576,13.49392],[46.79375,13.49231],[46.79224,13.49248],[46.79217,13.50032],[46.78898,13.50864],[46.78788,13.50767],[46.78624,13.51055],[46.78472,13.51506],[46.7818,13.52014],[46.78025,13.52411],[46.77981,13.52693],[46.77842,13.5298],[46.77734,13.52814],[46.776,13.5311],[46.77422,13.53632],[46.77521,13.54053],[46.77435,13.54255],[46.77432,13.54518],[46.77098,13.55341],[46.76147,13.56397],[46.7551,13.56938],[46.75427,13.57114],[46.75144,13.5746],[46.74971,13.57603],[46.74913,13.57727],[46.74468,13.58726],[46.74297,13.5965],[46.74288,13.59808],[46.74367,13.60379],[46.74328,13.60695],[46.74246,13.60902],[46.73754,13.61386],[46.73651,13.61601],[46.73532,13.62036],[46.72704,13.63045],[46.72411,13.63527],[46.72272,13.63846],[46.72159,13.64563],[46.72027,13.64526],[46.72018,13.64434],[46.71961,13.64508],[46.72014,13.64589],[46.72004,13.64723],[46.7196,13.65025],[46.71894,13.65204],[46.71415,13.66183],[46.71115,13.6657],[46.70969,13.66644],[46.7096,13.66809],[46.70875,13.67046],[46.69995,13.68107],[46.69692,13.68234],[46.69469,13.68494],[46.69396,13.68846],[46.69434,13.69082],[46.69562,13.69438],[46.69561,13.69588],[46.69503,13.69757],[46.69329,13.69941],[46.69112,13.70055],[46.68897,13.70099],[46.68621,13.70018],[46.68166,13.69659],[46.67936,13.69803],[46.67723,13.70023],[46.67616,13.70349],[46.6758,13.70947],[46.67327,13.71277],[46.66875,13.72532],[46.66867,13.72755],[46.6673,13.73326],[46.66719,13.73993],[46.66655,13.74551],[46.66596,13.74635],[46.66189,13.74797],[46.66145,13.75179],[46.66172,13.76086],[46.66141,13.76313],[46.66065,13.76399],[46.65733,13.76397],[46.65728,13.76202],[46.65689,13.76607],[46.65608,13.76533],[46.6547,13.76535],[46.65345,13.76619],[46.65013,13.77515],[46.6503,13.77744],[46.65216,13.77976],[46.65277,13.78167],[46.65245,13.78463],[46.65111,13.78948],[46.65147,13.79276],[46.65097,13.79534],[46.64893,13.79828],[46.64488,13.80055],[46.64089,13.80774],[46.63927,13.81111],[46.63843,13.81533],[46.63643,13.8204],[46.63528,13.82679],[46.63387,13.83053],[46.63258,13.83175],[46.62792,13.83446],[46.62589,13.83489],[46.62049,13.83462],[46.61632,13.83762],[46.61595,13.8399],[46.61692,13.84413],[46.61645,13.84713],[46.61481,13.84967],[46.61024,13.85313],[46.61082,13.85466],[46.60938,13.85174],[46.60916,13.85192],[46.60895,13.85304],[46.60688,13.85715],[46.60707,13.85818],[46.60617,13.85873],[46.60564,13.8597],[46.60567,13.86175],[46.60352,13.87246],[46.60301,13.87744],[46.60015,13.87769],[46.59966,13.87707],[46.60015,13.87769],[46.60291,13.87764],[46.60352,13.87246],[46.60301,13.87408],[46.59478,13.86047],[46.59284,13.85396],[46.59007,13.8494],[46.58849,13.84794],[46.5856,13.84694],[46.58367,13.84482],[46.58351,13.84046],[46.58257,13.83871],[46.58089,13.8377],[46.57846,13.83806],[46.57458,13.84288],[46.57356,13.84353],[46.57229,13.843],[46.57135,13.8419],[46.56924,13.81718],[46.56937,13.81368],[46.56991,13.81409],[46.56801,13.8119],[46.56465,13.80349],[46.56162,13.80193],[46.55798,13.79823],[46.55508,13.78929],[46.55009,13.77785],[46.54992,13.77602],[46.55044,13.7698],[46.55015,13.76615],[46.54808,13.75975],[46.54755,13.75649],[46.54751,13.74492],[46.54812,13.73819],[46.54746,13.73231],[46.54744,13.72801],[46.54807,13.72487],[46.54843,13.71672],[46.54957,13.70913],[46.55043,13.69742],[46.55047,13.69608],[46.55017,13.69565],[46.55046,13.69361],[46.55028,13.69157],[46.55056,13.69137],[46.54963,13.68496],[46.55003,13.6799],[46.55156,13.67272],[46.55109,13.66897],[46.54753,13.66369],[46.54497,13.65542],[46.54485,13.65367],[46.54364,13.65298],[46.54248,13.65067],[46.54167,13.64557],[46.54072,13.64473],[46.53819,13.64443],[46.53718,13.64151],[46.53599,13.63966],[46.53515,13.63919],[46.53462,13.63791],[46.53388,13.63813],[46.53315,13.63743],[46.53248,13.6351],[46.53196,13.63647],[46.53107,13.63634],[46.52892,13.6334],[46.52807,13.63149],[46.52766,13.62931],[46.52769,13.62724],[46.52811,13.62673],[46.52723,13.62463],[46.52586,13.62307],[46.52629,13.62121],[46.52536,13.62187],[46.5239,13.6207],[46.5227,13.61745],[46.52141,13.61562],[46.52054,13.61512],[46.52065,13.60916],[46.51945,13.61031],[46.51803,13.61342],[46.51641,13.61498],[46.51496,13.61463],[46.51423,13.61285],[46.51329,13.61196],[46.51322,13.61115],[46.51388,13.60964],[46.51509,13.60874],[46.51572,13.60715],[46.51366,13.60781],[46.51233,13.60753],[46.51125,13.60635],[46.50992,13.6031],[46.50804,13.60051],[46.50752,13.59714],[46.50566,13.59362],[46.5044,13.58466],[46.50482,13.58169],[46.50468,13.58021],[46.50442,13.57951],[46.50392,13.57958],[46.5033,13.58172],[46.50328,13.58025],[46.50314,13.58202],[46.50392,13.57958],[46.50442,13.57951],[46.50446,13.58029],[46.50516,13.58006],[46.50484,13.58038],[46.50458,13.57859],[46.50497,13.57415],[46.50683,13.57056],[46.50768,13.56688],[46.50783,13.56433],[46.50905,13.55971],[46.51069,13.5437],[46.50917,13.53534],[46.50872,13.53417],[46.50715,13.53315],[46.50632,13.53175],[46.50562,13.52389],[46.50386,13.51876],[46.50296,13.51323],[46.50287,13.50653],[46.501,13.50145],[46.50096,13.50019],[46.50172,13.49747],[46.50581,13.49327],[46.50768,13.48897],[46.50954,13.4777],[46.50979,13.47185],[46.50816,13.45857],[46.50565,13.45465],[46.50534,13.45078],[46.5038,13.44499],[46.50309,13.43836],[46.50223,13.43452],[46.50275,13.4272],[46.50339,13.42349],[46.50306,13.42213],[46.50118,13.41995],[46.5006,13.4182],[46.50099,13.41282],[46.50028,13.40826],[46.50154,13.4035],[46.50006,13.39876],[46.50106,13.391],[46.5012,13.38515],[46.50376,13.3791],[46.50421,13.37223],[46.50597,13.3655],[46.50785,13.36312],[46.50968,13.35795],[46.51162,13.34602],[46.51227,13.3371],[46.51164,13.32986],[46.51054,13.3264],[46.5093,13.32491],[46.50938,13.32325],[46.50905,13.32266],[46.50776,13.30916],[46.50655,13.30625],[46.5049,13.30432],[46.50214,13.30387],[46.49958,13.30056],[46.4978,13.29921],[46.4937,13.29939],[46.49008,13.29826],[46.48761,13.29915],[46.48392,13.29939],[46.48112,13.29839],[46.47656,13.29398],[46.47429,13.29244],[46.47311,13.29228],[46.46666,13.29346],[46.46496,13.29542],[46.46184,13.29723],[46.46086,13.29916],[46.46024,13.30304],[46.45712,13.30843],[46.45559,13.31268],[46.45287,13.31662],[46.45009,13.31822],[46.44821,13.31843],[46.44648,13.31768],[46.44352,13.31526],[46.44076,13.31202],[46.43908,13.31136],[46.42549,13.31901],[46.42101,13.32065],[46.41958,13.32005],[46.41438,13.31468],[46.41205,13.31371],[46.41098,13.31269],[46.40856,13.30923],[46.4081,13.30797],[46.40772,13.30467],[46.40591,13.29766],[46.40529,13.29203],[46.40012,13.28417],[46.39833,13.28242],[46.39632,13.27885],[46.39553,13.27465],[46.39655,13.27105],[46.39664,13.26953],[46.3956,13.26368],[46.39368,13.25763],[46.3945,13.25228],[46.39451,13.2461],[46.39293,13.24124],[46.39267,13.23867],[46.39349,13.22191],[46.39514,13.21064],[46.39594,13.19737],[46.39855,13.18789],[46.39916,13.18376],[46.39617,13.17248],[46.39463,13.16856],[46.39243,13.16513],[46.3889,13.16253],[46.38696,13.15978],[46.38688,13.15045],[46.38744,13.14466],[46.38697,13.14133],[46.38623,13.14],[46.38072,13.13509],[46.37965,13.13653],[46.37918,13.13579],[46.37942,13.13482],[46.37908,13.13438],[46.37758,13.13405],[46.37715,13.13525],[46.37656,13.13546],[46.3689,13.13364],[46.3596,13.13688],[46.34831,13.14163],[46.3446,13.13965],[46.34225,13.13971],[46.34136,13.14089],[46.34001,13.14139],[46.33947,13.1432],[46.33796,13.14306],[46.33633,13.14137],[46.33644,13.1403],[46.3345,13.1399],[46.33329,13.13905],[46.33231,13.13932],[46.33191,13.13875],[46.33159,13.13965],[46.33026,13.13937],[46.32924,13.13715],[46.32992,13.13533],[46.32891,13.13424],[46.32929,13.13355],[46.32928,13.13239],[46.32693,13.13133],[46.32347,13.12834],[46.3211,13.12831],[46.32087,13.13037],[46.31918,13.13001],[46.31441,13.12762],[46.30838,13.12748],[46.3067,13.12613],[46.30512,13.12316],[46.3038,13.12175],[46.29933,13.12049],[46.29942,13.12095],[46.29904,13.12035],[46.29912,13.11896],[46.29784,13.11906],[46.29339,13.12116],[46.29234,13.12295],[46.29001,13.12375],[46.28921,13.12256],[46.28644,13.12416],[46.28565,13.12701],[46.28594,13.12911],[46.28503,13.1319],[46.28132,13.1354],[46.27783,13.14033],[46.27735,13.14212],[46.27783,13.14033],[46.27657,13.1411],[46.27595,13.14072],[46.27541,13.14136],[46.27537,13.14334],[46.27503,13.14392],[46.26846,13.14714],[46.26649,13.14722],[46.26434,13.14644],[46.26012,13.14766],[46.25277,13.14741],[46.25068,13.14814],[46.24888,13.1496],[46.24484,13.14998],[46.24381,13.15115],[46.24304,13.14977],[46.24201,13.14926],[46.24004,13.15108],[46.23899,13.15357],[46.23753,13.15362],[46.23678,13.15287],[46.23544,13.15494],[46.23296,13.15634],[46.23231,13.15742],[46.23147,13.1624],[46.23415,13.16362],[46.23256,13.16741],[46.23334,13.16842],[46.23204,13.17303],[46.23163,13.17634],[46.22929,13.17906],[46.22804,13.18154],[46.22381,13.18419],[46.22104,13.18825],[46.21655,13.19268],[46.20963,13.19633],[46.20952,13.19724],[46.21018,13.19803],[46.2107,13.20436],[46.21041,13.20424],[46.21034,13.20507],[46.20953,13.2051],[46.20918,13.20641],[46.20824,13.20672],[46.2082,13.20963],[46.20867,13.21268],[46.20916,13.21369],[46.20645,13.2197],[46.20375,13.22365],[46.20344,13.22481],[46.20386,13.22605],[46.20265,13.22764],[46.20156,13.22709],[46.19934,13.22736],[46.19774,13.22615],[46.19571,13.22641],[46.19295,13.2283],[46.19291,13.22913],[46.19218,13.23029],[46.18693,13.23103],[46.18543,13.23319],[46.18423,13.23279],[46.18189,13.23476],[46.18041,13.23538],[46.17688,13.24367],[46.17607,13.24406],[46.17226,13.24397],[46.16953,13.24662],[46.16811,13.24917],[46.16797,13.25294],[46.16395,13.25295],[46.1632,13.25338],[46.16151,13.25197],[46.16021,13.25169],[46.16011,13.25097],[46.15834,13.25145],[46.15521,13.25127],[46.15312,13.24983],[46.15365,13.24826],[46.15269,13.24787],[46.1517,13.24808],[46.15163,13.24886],[46.15037,13.24938],[46.14989,13.25156],[46.14888,13.25092],[46.14589,13.25097],[46.14543,13.25187],[46.14438,13.25251],[46.14184,13.25253],[46.13883,13.25381],[46.13638,13.25332],[46.13636,13.25143],[46.12873,13.25077],[46.11304,13.25137],[46.09448,13.26625],[46.08523,13.27273],[46.07847,13.27605],[46.07582,13.27886],[46.07022,13.28245],[46.06791,13.28264],[46.06658,13.28186],[46.05267,13.28579],[46.0445,13.29107],[46.04135,13.29378],[46.04053,13.29518],[46.03966,13.29541],[46.03866,13.29685],[46.03739,13.29731],[46.03525,13.29506],[46.03404,13.29482],[46.03211,13.29709],[46.02953,13.29728],[46.02878,13.29841],[46.02692,13.29926],[46.02222,13.30298],[46.02043,13.30672],[46.01722,13.30693],[46.0153,13.31825],[46.01432,13.32009],[46.01087,13.32327],[46.00412,13.32652],[46.0025,13.32629],[45.99994,13.32782],[45.99878,13.32486],[45.99994,13.32782],[45.99679,13.33028],[45.99548,13.33226],[45.99343,13.33401],[45.99294,13.33384],[45.99154,13.33169],[45.98624,13.33072],[45.97981,13.33715],[45.97586,13.32755],[45.97139,13.33041],[45.96623,13.33181],[45.96112,13.33485],[45.95729,13.3363],[45.95709,13.33586],[45.95704,13.33637],[45.95126,13.34036],[45.94937,13.34217],[45.94709,13.3402],[45.94637,13.34013],[45.94536,13.33849],[45.9438,13.33772],[45.94308,13.33762],[45.94128,13.33862],[45.93747,13.33769],[45.93543,13.33565],[45.93303,13.33468],[45.93227,13.3333],[45.93104,13.3323],[45.92714,13.33254],[45.92589,13.33109],[45.92273,13.3308],[45.91999,13.33237],[45.91812,13.33188],[45.9164,13.32904],[45.9146,13.3283],[45.91365,13.32582],[45.91198,13.32357],[45.90988,13.32256],[45.9063,13.31267],[45.9056,13.31318],[45.9041,13.31268],[45.90317,13.31087],[45.90321,13.30975],[45.90044,13.30953],[45.89979,13.31098],[45.89917,13.30972],[45.89795,13.30972],[45.89767,13.31022],[45.8925,13.30987],[45.89188,13.31295],[45.89116,13.31323],[45.89075,13.31501],[45.88971,13.31627],[45.88689,13.3172],[45.88548,13.3185],[45.88509,13.31979],[45.8851,13.32184],[45.88259,13.32297],[45.87973,13.32352],[45.87407,13.32231],[45.86237,13.32329],[45.86165,13.32322],[45.86162,13.32249],[45.85995,13.32156],[45.85528,13.32203],[45.85226,13.32112],[45.83924,13.32851],[45.83897,13.32919],[45.83855,13.32891],[45.83169,13.33294],[45.82977,13.33276],[45.82903,13.33329],[45.82986,13.33358],[45.83001,13.33529],[45.8296,13.33787],[45.82811,13.33934],[45.82911,13.34147],[45.82812,13.34245],[45.82847,13.34334],[45.82792,13.34383],[45.83078,13.34952],[45.8345,13.34881],[45.83581,13.34776],[45.8345,13.34881],[45.83078,13.34952],[45.82537,13.33885],[45.82309,13.33814],[45.82247,13.33709],[45.82172,13.33717],[45.82113,13.33652],[45.82057,13.33439],[45.81936,13.33658],[45.81758,13.33843],[45.80965,13.34321],[45.80599,13.34373],[45.80429,13.34473],[45.79992,13.34988],[45.79881,13.35036],[45.79718,13.35206],[45.79729,13.3526],[45.79681,13.35298],[45.77742,13.36388],[45.77303,13.36706],[45.77293,13.36484],[45.77303,13.36706],[45.77053,13.3718],[45.76975,13.3726],[45.76864,13.37266],[45.76697,13.37113],[45.76582,13.37096],[45.73171,13.38891],[45.72855,13.38809],[45.72562,13.38634],[45.71783,13.38526],[45.7065,13.38265],[45.68666,13.38508],[45.68554,13.38609],[45.68126,13.38639],[45.6812,13.38772],[45.67893,13.3882],[45.6781,13.38968],[45.67852,13.39449],[45.67737,13.39481],[45.6789,13.39829],[45.67845,13.39842],[45.6784,13.39794],[45.67845,13.39842],[45.67886,13.39831],[45.67734,13.39489],[45.67852,13.39449],[45.6781,13.38968],[45.67935,13.38805],[45.68113,13.38781],[45.68179,13.38659],[45.68554,13.38609],[45.68666,13.38508],[45.7065,13.38265],[45.71783,13.38526],[45.72562,13.38634],[45.72855,13.38809],[45.73171,13.38891],[45.76582,13.37096],[45.76697,13.37113],[45.76864,13.37266],[45.76975,13.3726],[45.77053,13.3718],[45.77303,13.36706],[45.77293,13.36484],[45.77303,13.36706],[45.77742,13.36388],[45.79681,13.35298],[45.79729,13.3526],[45.79718,13.35206],[45.79881,13.35036],[45.79992,13.34988],[45.80464,13.34446],[45.80599,13.34373],[45.80965,13.34321],[45.81785,13.33823],[45.81936,13.33658],[45.82007,13.33514],[45.81979,13.33441]];
+
+// Notti confermate (una sola struttura ciascuna, invariate)
+const confirmed = [
+  { night:0, date:"07/08", town:"Mallnitz", name:"Pension Thalerhof",
+    lat:46.9738069, lon:13.1761143,
+    address:"Rabisch 7, 9822 Mallnitz", phone:"+43 4784 274",
+    price:"128€ totali (2 pers.), cash in loco il 07/08", site:null,
+    notes:"Camera famiglia, doccia/vasca, balcone, colazione inclusa. Referente Silvia Thaler. Prenotazione nr. 1561343.",
+    cancel:"CONFERMATA. Cancellazione gratuita ora; dal 24/07 20%; no-show o arrivo oltre le 18:00 → 90%.", cancelOk:true },
+
+  { night:1, date:"08/08", town:"Spittal an der Drau", name:"Hotel Erlebnis Post",
+    lat:46.7968, lon:13.4928,
+    address:"Hauptplatz 13, 9800 Spittal an der Drau", phone:null,
+    price:"Camera doppia standard + colazione, prepagato (trivago)", site:"erlebnis-post.at",
+    notes:"Sulla piazza principale, centralissimo. Rimessa bici sicura, colazione abbondante anche gluten-free, sauna gratuita. Richiedere al check-in: camera silenziosa e colazione vegetariana.",
+    cancel:"CONFERMATA — booking nr. 13362410. Prepagato, NON rimborsabile.", cancelOk:false },
+
+  { night:2, date:"09/08", town:"Villach", name:"Moser's Pension \"Zum Wilden Mann\"",
+    lat:46.5997508, lon:13.8769716,
+    address:"18. November-Platz 8, 9500 Villach", phone:"+43 4242 34933",
+    price:"Doppia 101€, colazione da valutare (non compresa)", site:"moser-pension.at",
+    notes:"Collegamento diretto al Drauradweg. Richieste inviate: colazione vegetariana, camera tranquilla sul retro, ricovero bici.",
+    cancel:"CONFERMATA (21/07). Cancellazione gratuita fino al 4 agosto 2026.", cancelOk:true },
+
+  { night:3, date:"10/08", town:"Tarvisio", name:"Affittacamere Fiocco di Neve",
+    lat:46.503200, lon:13.579800,
+    address:"Via Principe di Piemonte 3, 33018 Tarvisio", phone:"+39 345 235 2258",
+    price:"129,28€ tot., camera doppia bagno in comune", site:"affittacamerefioccodinevetarvisio.it",
+    notes:"Conferma nr. 6258.233.727, PIN 1145. Ricovero bici sicuro + lavatrice. Niente colazione interna. Check-in 16:00-19:00 (dopo, supplemento 10€).",
+    cancel:"CONFERMATA (22/07). Cancellazione gratuita fino all'8/08 23:59, poi penale piena.", cancelOk:true }
+];
+
+// Notti ancora da confermare: ogni struttura è una "candidata" con lettera e stato
+// modificabile toccando il popup (da chiamare / occupato-pieno / confermato).
+// Lo stato di default riflette quanto sappiamo al 26/07/2026.
+const candidateGroups = [
+  { night:4, date:"11/08", town:"Venzone/Gemona", items:[
+    { letter:"A", name:"B&B Agli Ulivi (Gemona)", status:"dachiamare",
+      lat:46.277500, lon:13.142500,
+      address:"Via Val di Fiemme 15, 33013 Gemona del Friuli (UD)", phone:"366 4572526",
+      price:"n.d.", site:null,
+      notes:"Direttamente sulla ciclovia Alpe Adria, convenzione noleggio/riparazione bici, giardino grande, colazione italiana. Preferita dal 26/07 dopo il \"completo\" di Casali Scjs." },
+    { letter:"B", name:"Affittacamere Taverna Gattolini", status:"dachiamare",
+      lat:46.354000, lon:13.139500,
+      address:"Via Alberton Del Colle 12, 33010 Venzone (UD)", phone:"Centro Prenotazioni FVG: 0428 2392",
+      price:"n.d.", site:"alpe-adria-radweg.com",
+      notes:"Partner ufficiale della Ciclovia Alpe Adria, dentro Venzone stesso, taverna con cucina in loco. Prenotazione tramite ciclovia@tarvisiano.org." },
+    { letter:"C", name:"Agriturismo Casali Scjs", status:"occupato",
+      lat:46.345000, lon:13.140000,
+      address:"Via Strada di Scjs 1, 33010 Venzone (UD)", phone:"340 3284301 / 380 1733029",
+      price:"n.d.", site:null,
+      notes:"Prima scelta iniziale (cavalli, giardino, ristorante interno) — verificato COMPLETO il 26/07 per l'11→12/08." }
+  ]},
+  { night:5, date:"12/08", town:"Udine (Lauzacco)", items:[
+    { letter:"A", name:"Le Oche Selvatiche — Az. Agricola Stefanutti", status:"dachiamare",
+      lat:45.998000, lon:13.325000,
+      address:"Via Pio Paschini 6, 33050 Lauzacco, Pavia di Udine (UD)", phone:"+39 0432 675865 / +39 340 6869705",
+      price:"n.d.", site:"agricolastefanutti.com",
+      notes:"Animali da cortile veri (oche, galline, cagnolini), salumi artigianali fatti in casa, giardino, colazione con torte casalinghe. ~5 km a sud di Udine, sulla ciclovia." }
+  ]},
+  { night:6, date:"13/08", town:"Palmanova (Bagnaria Arsa)", items:[
+    { letter:"A", name:"La Selce Farmhouse", status:"dachiamare",
+      lat:45.835400, lon:13.346700,
+      address:"Via XXIV Maggio 15, 33050 Bagnaria Arsa (UD)", phone:"+39 333 1180020",
+      price:"n.d.", site:"laselcefarmhouse.it",
+      notes:"Azienda agricola a conduzione familiare da cinque generazioni, fattoria didattica, orto, colazione con prodotti dell'azienda. A metà tra Palmanova e Aquileia." }
+  ]}
+];
+
+const arrival = { night:7, date:"14/08", town:"Grado", name:"Arrivo — nessun pernottamento",
+  lat:45.6781065, lon:13.3979091,
+  address:"Grado (GO)", phone:null, price:null, site:null,
+  notes:"Ultimo giorno: Palmanova→Aquileia→Grado (pranzo)→Aquileia→stazione di Cervignano. Rientro con Regionale 3448/3993, 19:53→23:06 verso Ferrara (da confermare data/acquisto).",
+  cancel:null };
+
+// --- Dati treni (andata 6-7/08, ritorno 14/08) ---
+// Coordinate a livello di stazione/città (non i binari esatti) — sufficienti per una mappa schematica.
+const ST = {
+  Ferrara:[44.8341,11.6198], Rovigo:[45.0705,11.7909], Padova:[45.4166,11.8767],
+  VeneziaMestre:[45.4838,12.2246], VeneziaSLucia:[45.4408,12.3155],
+  Treviso:[45.6669,12.2422], Sacile:[45.9563,12.5006], Casarsa:[45.9515,12.8524],
+  Cormons:[45.9557,13.4753], Gorizia:[45.9382,13.6187], NovaGorica:[45.9526,13.6445],
+  MostNaSoci:[46.1841,13.8471], BohinjskaBistrica:[46.2764,13.9508], Jesenice:[46.4297,14.0561],
+  Villach:[46.6111,13.8548], SpittalStazione:[46.7973,13.4936], MallnitzStazione:[46.9847,13.1934],
+  Cervignano:[45.8199,13.3345], Portogruaro:[45.7827,12.8367], SanDona:[45.6280,12.5661]
+};
+
+const trainPaths = [
+  { dir:'andata', coords:[ST.Ferrara, ST.Rovigo, ST.Padova, ST.VeneziaMestre, ST.VeneziaSLucia] },
+  { dir:'andata', coords:[ST.VeneziaSLucia, ST.Treviso, ST.Sacile, ST.Casarsa, ST.Cormons, ST.Gorizia] },
+  { dir:'cambio', coords:[ST.Gorizia, ST.NovaGorica] },
+  { dir:'andata', coords:[ST.NovaGorica, ST.MostNaSoci, ST.BohinjskaBistrica, ST.Jesenice] },
+  { dir:'andata', coords:[ST.Jesenice, ST.Villach] },
+  { dir:'andata', coords:[ST.Villach, ST.SpittalStazione, ST.MallnitzStazione] },
+  { dir:'ritorno', coords:[ST.Cervignano, ST.Portogruaro, ST.SanDona, ST.VeneziaMestre] },
+  { dir:'ritorno', coords:[ST.VeneziaMestre, ST.Padova, ST.Rovigo, ST.Ferrara] }
+];
+
+const trainStations = [
+  { name:"Ferrara", lat:ST.Ferrara[0], lon:ST.Ferrara[1], events:[
+      {label:"Partenza per Venezia", time:"pomeriggio 06/08", desc:"Regionale, bici al seguito"},
+      {label:"Arrivo da Venezia Mestre", time:"23:06", desc:"Regionale 3993 — fine viaggio"}
+  ]},
+  { name:"Venezia S. Lucia / Mestre", lat:ST.VeneziaSLucia[0], lon:ST.VeneziaSLucia[1], events:[
+      {label:"Arrivo da Ferrara", time:"sera 06/08", desc:"Notte a Venezia Santa Marta"},
+      {label:"Partenza per Gorizia Centrale", time:"05:13", desc:"Regionale 16754, via Treviso-Sacile-Casarsa-Cormons"},
+      {label:"Cambio (ritorno)", time:"~21:xx", desc:"Da Regionale 3448 (Cervignano) a Regionale 3993 (per Ferrara) — orario esatto da verificare"}
+  ]},
+  { name:"Gorizia Centrale", lat:ST.Gorizia[0], lon:ST.Gorizia[1], events:[
+      {label:"Arrivo da Venezia S.Lucia", time:"08:02", desc:"Regionale 16754"},
+      {label:"Cambio a piedi/bici per Nova Gorica", time:"~58 min di margine", desc:"~1,8 km, confine a Piazza Transalpina, nessun biglietto"}
+  ]},
+  { name:"Nova Gorica", lat:ST.NovaGorica[0], lon:ST.NovaGorica[1], events:[
+      {label:"Partenza per Jesenice", time:"09:00", desc:"R 4202"}
+  ]},
+  { name:"Jesenice", lat:ST.Jesenice[0], lon:ST.Jesenice[1], events:[
+      {label:"Arrivo da Nova Gorica", time:"11:11", desc:"R 4202"},
+      {label:"Partenza per Villach Hbf", time:"12:30", desc:"EC 214 — posto bici riservato, carrozza 255"}
+  ]},
+  { name:"Villach Hbf", lat:ST.Villach[0], lon:ST.Villach[1], events:[
+      {label:"Arrivo da Jesenice", time:"13:15", desc:"EC 214"},
+      {label:"Proseguimento per Mallnitz", time:"pomeriggio", desc:"Regionale/S-Bahn, carrozza bici dedicata"}
+  ]},
+  { name:"Mallnitz", lat:ST.MallnitzStazione[0], lon:ST.MallnitzStazione[1], events:[
+      {label:"Arrivo — Notte 1", time:"primo pomeriggio 07/08", desc:"Pension Thalerhof"}
+  ]},
+  { name:"Cervignano-Aquileia-Grado", lat:ST.Cervignano[0], lon:ST.Cervignano[1], events:[
+      {label:"Partenza per Venezia Mestre", time:"19:53", desc:"Regionale 3448 — poi cambio per Ferrara (Regionale 3993)"}
+  ]}
+];
+
+const map = L.map('map', { scrollWheelZoom:true, tap:true });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 18
+}).addTo(map);
+
+// Percorso reale (vie effettive), ricalcato sulla Ciclovia Alpe Adria
+L.polyline(routeCoords, { color:'#9c3d21', weight:3.5, opacity:0.75 }).addTo(map);
+
+const bikeBounds = routeCoords.slice();
+
+function popupRows(s){
+  let html = `<div class="popup-row"><b>Indirizzo:</b> ${s.address}</div>`;
+  if(s.phone) html += `<div class="popup-row"><b>Tel:</b> <a class="popup-link" href="tel:${s.phone.replace(/\s+/g,'')}">${s.phone}</a></div>`;
+  if(s.price) html += `<div class="popup-row"><b>Prezzo:</b> ${s.price}</div>`;
+  if(s.site) html += `<div class="popup-row"><b>Sito:</b> <a class="popup-link" href="https://${s.site}" target="_blank">${s.site}</a></div>`;
+  if(s.notes) html += `<div class="popup-row">${s.notes}</div>`;
+  return html;
+}
+
+// --- Notti confermate: un solo marker verde ciascuna ---
+confirmed.forEach(s=>{
+  const marker = L.circleMarker([s.lat, s.lon], {
+    radius: 10, fillColor:'#8fae74', color:'#4b6b3a', weight:2, fillOpacity:0.95
+  }).addTo(map);
+  let html = `<div class="popup-title">${s.name}</div>`;
+  html += `<div class="popup-sub">Notte ${s.night} — ${s.town} · ${s.date}/2026</div>`;
+  html += `<span class="popup-badge b-confermato">confermata</span>`;
+  html += popupRows(s);
+  if(s.cancel) html += `<div class="popup-cancel ${s.cancelOk ? 'ok':''}">${s.cancel}</div>`;
+  marker.bindPopup(html);
+  bikeBounds.push([s.lat, s.lon]);
+});
+
+// --- Notti da confermare: candidate con lettera + stato modificabile ---
+const statusStyle = {
+  dachiamare:  { bg:'#ffffff', border:'#6b5a4d', text:'#3b2f28', label:'da chiamare' },
+  occupato:    { bg:'#e3d9c9', border:'#9c3d21', text:'#9c3d21', label:'occupato / pieno' },
+  confermato:  { bg:'#8fae74', border:'#4b6b3a', text:'#1f3315', label:'confermato' }
+};
+function candidateIcon(letter, status){
+  const c = statusStyle[status] || statusStyle.dachiamare;
+  return L.divIcon({
+    className: 'candidate-marker',
+    html: `<div style="width:26px;height:26px;border-radius:50%;background:${c.bg};border:2.5px solid ${c.border};display:flex;align-items:center;justify-content:center;font-weight:bold;font-family:Georgia,serif;font-size:13px;color:${c.text};box-shadow:0 1px 3px rgba(0,0,0,0.35);">${letter}</div>`,
+    iconSize:[26,26], iconAnchor:[13,13]
+  });
+}
+
+const candidateMarkers = {}; // statusKey -> {marker, letter}
+
+candidateGroups.forEach(group=>{
+  group.items.forEach(item=>{
+    const statusKey = `aa2026_${group.night}_${item.letter}`;
+    const saved = localStorage.getItem(statusKey);
+    const status = saved || item.status;
+
+    const marker = L.marker([item.lat, item.lon], { icon: candidateIcon(item.letter, status) }).addTo(map);
+
+    marker.bindPopup(function(){
+      const cur = localStorage.getItem(statusKey) || item.status;
+      let html = `<div class="popup-title">${item.letter} — ${item.name}</div>`;
+      html += `<div class="popup-sub">Notte ${group.night} — ${group.town} · ${group.date}/2026</div>`;
+      html += `<span class="popup-badge b-candidata">candidata</span>`;
+      html += popupRows(item);
+      html += `<div class="popup-status">`;
+      html += `<span class="status-title">Stato:</span>`;
+      ['dachiamare','occupato','confermato'].forEach(val=>{
+        const checked = cur===val ? 'checked' : '';
+        html += `<label><input type="radio" name="${statusKey}" value="${val}" data-statuskey="${statusKey}" ${checked}> ${statusStyle[val].label}</label>`;
+      });
+      html += `</div>`;
+      return html;
+    });
+
+    candidateMarkers[statusKey] = { marker, letter: item.letter };
+    bikeBounds.push([item.lat, item.lon]);
+  });
+});
+
+map.on('popupopen', function(e){
+  const el = e.popup.getElement();
+  if(!el) return;
+  const radios = el.querySelectorAll('input[type=radio][data-statuskey]');
+  radios.forEach(r=>{
+    r.addEventListener('change', function(){
+      const key = this.getAttribute('data-statuskey');
+      const val = this.value;
+      localStorage.setItem(key, val);
+      if(candidateMarkers[key]){
+        candidateMarkers[key].marker.setIcon(candidateIcon(candidateMarkers[key].letter, val));
+      }
+    });
+  });
+});
+
+// --- Arrivo ---
+{
+  const s = arrival;
+  const marker = L.circleMarker([s.lat, s.lon], {
+    radius: 10, fillColor:'#3b2f28', color:'#3b2f28', weight:2, fillOpacity:0.95
+  }).addTo(map);
+  let html = `<div class="popup-title">${s.name}</div>`;
+  html += `<div class="popup-sub">Notte ${s.night} — ${s.town} · ${s.date}/2026</div>`;
+  html += popupRows(s);
+  marker.bindPopup(html);
+  bikeBounds.push([s.lat, s.lon]);
+}
+
+// --- Layer treni (nascosto di default, si accende col bottone) ---
+const trainLayer = L.layerGroup();
+const trainBounds = [];
+
+trainPaths.forEach(p=>{
+  const style = p.dir==='andata' ? { color:'#2b6bd9', dashArray:'8,6' }
+              : p.dir==='ritorno' ? { color:'#d99a3d', dashArray:'8,6' }
+              : { color:'#6b5a4d', dashArray:'2,5' }; // cambio a piedi/bici
+  L.polyline(p.coords, Object.assign({ weight:3, opacity:0.85 }, style)).addTo(trainLayer);
+  p.coords.forEach(c=>trainBounds.push(c));
+});
+
+function trainIcon(){
+  return L.divIcon({
+    className:'train-marker',
+    html:`<div style="width:22px;height:22px;border-radius:50%;background:#2b6bd9;border:2px solid #173e82;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,0.35);">🚆</div>`,
+    iconSize:[22,22], iconAnchor:[11,11]
+  });
+}
+
+trainStations.forEach(s=>{
+  const marker = L.marker([s.lat, s.lon], { icon: trainIcon() });
+  let html = `<div class="popup-title">${s.name}</div>`;
+  html += `<span class="popup-badge b-treno">stazione</span>`;
+  s.events.forEach(ev=>{
+    html += `<div class="popup-event"><b>${ev.time}</b> — ${ev.label}<br>${ev.desc}</div>`;
+  });
+  marker.bindPopup(html);
+  marker.addTo(trainLayer);
+  trainBounds.push([s.lat, s.lon]);
+});
+
+let trainVisible = false;
+document.getElementById('trainBtn').addEventListener('click', function(){
+  trainVisible = !trainVisible;
+  this.classList.toggle('active', trainVisible);
+  if(trainVisible){
+    trainLayer.addTo(map);
+    map.fitBounds(bikeBounds.concat(trainBounds), { padding:[26,26] });
+  } else {
+    map.removeLayer(trainLayer);
+    map.fitBounds(bikeBounds, { padding:[26,26] });
+  }
+});
+
+map.fitBounds(bikeBounds, { padding:[26,26] });
+
+// Geolocalizzazione — utile per orientarsi lungo il percorso durante il viaggio
+let meMarker = null;
+document.getElementById('locateBtn').addEventListener('click', function(){
+  if(!navigator.geolocation){
+    alert('Geolocalizzazione non supportata su questo dispositivo/browser.');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    const { latitude, longitude } = pos.coords;
+    if(meMarker) map.removeLayer(meMarker);
+    meMarker = L.circleMarker([latitude, longitude], {
+      radius:9, fillColor:'#2b6bd9', color:'#173e82', weight:2, fillOpacity:0.95
+    }).addTo(map).bindPopup('Sei qui').openPopup();
+    map.setView([latitude, longitude], 13);
+  }, function(err){
+    alert('Impossibile ottenere la posizione: ' + err.message);
+  }, { enableHighAccuracy:true, timeout:8000 });
+});
+</script>
+
+</body>
+</html>
