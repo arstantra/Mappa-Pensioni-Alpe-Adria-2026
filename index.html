@@ -385,10 +385,20 @@ candidateGroups.forEach(group=>{
       return html;
     });
 
-    candidateMarkers[statusKey] = { marker, letter: item.letter };
+    candidateMarkers[statusKey] = { marker, letter: item.letter, popupRefresh: null };
     bikeBounds.push([item.lat, item.lon]);
   });
 });
+
+// Applica uno stato remoto (arrivato da altri dispositivi) a un marker candidato
+function applyRemoteStatus(statusKey, val){
+  if(!statusStyle[val]) return;
+  if(localStorage.getItem(statusKey) === val) return; // già allineato
+  localStorage.setItem(statusKey, val);
+  if(candidateMarkers[statusKey]){
+    candidateMarkers[statusKey].marker.setIcon(candidateIcon(candidateMarkers[statusKey].letter, val));
+  }
+}
 
 map.on('popupopen', function(e){
   const el = e.popup.getElement();
@@ -402,6 +412,7 @@ map.on('popupopen', function(e){
       if(candidateMarkers[key]){
         candidateMarkers[key].marker.setIcon(candidateIcon(candidateMarkers[key].letter, val));
       }
+      syncStatusToServer(key, val);
     });
   });
 });
@@ -517,6 +528,28 @@ function refreshSharedPosition(){
 
 refreshSharedPosition();
 setInterval(refreshSharedPosition, 90000); // riprova ogni 90s
+
+// Stato prenotazioni condiviso — chiunque guardi la mappa può toccare un pallino
+// e lo stato cambia per tutti (nessun PIN, come le note aggiornate al telefono).
+function loadRemoteStati(){
+  if(!SHARED_POS_URL || SHARED_POS_URL.indexOf('INCOLLA_QUI') !== -1) return;
+  fetch(SHARED_POS_URL + '?action=statusRead')
+    .then(r => r.json())
+    .then(data => {
+      if(!data || typeof data !== 'object') return;
+      Object.keys(data).forEach(function(k){ applyRemoteStatus(k, data[k]); });
+    })
+    .catch(function(){ /* silenzioso: niente rete */ });
+}
+
+function syncStatusToServer(key, val){
+  if(!SHARED_POS_URL || SHARED_POS_URL.indexOf('INCOLLA_QUI') !== -1) return;
+  fetch(SHARED_POS_URL + '?action=statusWrite&k=' + encodeURIComponent(key) + '&v=' + encodeURIComponent(val))
+    .catch(function(){ /* silenzioso: se offline resta comunque salvato in locale */ });
+}
+
+loadRemoteStati();
+setInterval(loadRemoteStati, 90000);
 </script>
 
 </body>
