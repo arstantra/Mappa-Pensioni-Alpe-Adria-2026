@@ -1,8 +1,8 @@
 {
-  "id": "./index.html",
+  "id": "/Mappa-Pensioni-Alpe-Adria-2026/mappa/",
   "name": "Alpe Adria in bici — Mappa",
   "short_name": "Mappa AA",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f3ead9",
