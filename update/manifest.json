@@ -1,8 +1,8 @@
 {
-  "id": "./update.html",
+  "id": "/Mappa-Pensioni-Alpe-Adria-2026/update/",
   "name": "Alpe Adria — Aggiorna posizione",
   "short_name": "Aggiorna AA",
-  "start_url": "./update.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f3ead9",
