@@ -139,7 +139,7 @@
 
 <div id="legend">
   <span class="item"><span class="dot letterdot" style="background:var(--green-light);border-color:var(--green)">0</span> confermata (numero notte)</span>
-  <span class="item"><span class="dot letterdot">A</span> candidata — tocca per segnare lo stato (occupato/escluse spariscono)</span>
+  <span class="item"><span class="dot letterdot">4</span> candidata (stesso numero = stessa notte) — tocca per segnare lo stato</span>
   <span class="item"><span class="dot" style="background:var(--brown)"></span> arrivo</span>
   <span class="item"><span class="dot" style="background:var(--terracotta)"></span> Andrea e Bea (posizione condivisa)</span>
   <span class="item"><span class="line"></span> treno andata</span>
@@ -377,7 +377,7 @@ candidateGroups.forEach(group=>{
     const saved = localStorage.getItem(statusKey);
     const status = saved || item.status;
 
-    const marker = L.marker([item.lat, item.lon], { icon: candidateIcon(item.letter, status) }).addTo(map);
+    const marker = L.marker([item.lat, item.lon], { icon: candidateIcon(group.night, status) }).addTo(map);
 
     marker.bindPopup(function(){
       const cur = localStorage.getItem(statusKey) || item.status;
@@ -409,7 +409,7 @@ function refreshGroupVisibility(night){
   const confirmedEntry = withStatus.find(s => s.val === 'confermato');
   withStatus.forEach(s=>{
     const entry = candidateMarkers[s.key];
-    entry.marker.setIcon(candidateIcon(entry.letter, s.val));
+    entry.marker.setIcon(candidateIcon(entry.night, s.val));
     if(confirmedEntry){
       entry.marker.setOpacity(s.key === confirmedEntry.key ? 1 : 0);
     } else {
